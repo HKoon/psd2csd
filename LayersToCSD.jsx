@@ -1,14 +1,14 @@
 ﻿// This script exports photoshop layers as individual PNGs. It also
-// writes a JSON file that can be imported into Spine where the images
+// writes a csd file that can be imported into Spine where the images
 // will be displayed in the same positions and draw order.
 
-// Setting defaults.
+// Setting defaults. 初始变量
 var writePngs = true;
 var writeTemplate = false;
-var writeJson = true;
+var writeCsd = true;
 var ignoreHiddenLayers = true;
 var pngScale = 1;
-var groupsAsSkins = false;
+var groupsAsimgs = false;
 var useRulerOrigin = false;
 var imagesDir = "./images/";
 var projectDir = "";
@@ -19,9 +19,9 @@ var typeText = "Scene";
 const settingsID = stringIDToTypeID("settings");
 const writePngsID = stringIDToTypeID("writePngs");
 const writeTemplateID = stringIDToTypeID("writeTemplate");
-const writeJsonID = stringIDToTypeID("writeJson");
+const writeCsdID = stringIDToTypeID("writeCsd");
 const ignoreHiddenLayersID = stringIDToTypeID("ignoreHiddenLayers");
-const groupsAsSkinsID = stringIDToTypeID("groupsAsSkins");
+const groupsAsimgsID = stringIDToTypeID("groupsAsimgs");
 const useRulerOriginID = stringIDToTypeID("useRulerOrigin");
 const pngScaleID = stringIDToTypeID("pngScale");
 const imagesDirID = stringIDToTypeID("imagesDir");
@@ -44,13 +44,13 @@ function tenNum()
 }
 
 function guid() {
-  function s4() {
+  function getFourNum() {
     return Math.floor((1 + Math.random()) * 0x10000)
       .toString(16)
       .substring(1);
   }
-  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-    s4() + '-' + s4() + s4() + s4();
+  return getFourNum() + getFourNum() + '-' + getFourNum() + '-' + getFourNum() + '-' +
+    getFourNum() + '-' + getFourNum() + getFourNum() + getFourNum();
 }
 
 function run () {
@@ -90,7 +90,7 @@ function run () {
 		if (pngScale != 1) restoreHistory();
 	}
 
-	if (!writeJson && !writePngs) {
+	if (!writeCsd && !writePngs) {
 		activeDocument.close(SaveOptions.DONOTSAVECHANGES);
 		return;
 	}
@@ -107,19 +107,19 @@ function run () {
 
 	storeHistory();
 
-	// Store the slot names and layers for each skin.
-	var slots = {}, skins = { "default": [] };
+	// Store the slot names and layers for each img.
+	var slots = {}, imgs = { "default": [] };
 	for (var i = layersCount - 1; i >= 0; i--) {
 		var layer = layers[i];
 
-		// Use groups as skin names.
-		var potentialSkinName = trim(layer.parent.name);
-		var layerGroupSkin = potentialSkinName.indexOf("-NOSKIN") == -1;
-		var skinName = (groupsAsSkins && layer.parent.typename == "LayerSet" && layerGroupSkin) ? potentialSkinName : "default";
+		// Use groups as img names.
+		var potentialimgName = trim(layer.parent.name);
+		var layerGroupimg = potentialimgName.indexOf("-NOimg") == -1;
+		var imgName = (groupsAsimgs && layer.parent.typename == "LayerSet" && layerGroupimg) ? potentialimgName : "default";
 
-		var skinLayers = skins[skinName];
-		if (!skinLayers) skins[skinName] = skinLayers = [];
-		skinLayers[skinLayers.length] = layer;
+		var imgLayers = imgs[imgName];
+		if (!imgLayers) imgs[imgName] = imgLayers = [];
+		imgLayers[imgLayers.length] = layer;
 
 		slots[layerName(layer)] = true;
 	}
@@ -132,65 +132,43 @@ function run () {
 	var	docHeight = activeDocument.height.as("px") * pngScale;
 
 	// Output skeleton and bones.
-	var json = '<GameProjectFile>\n';
-	json += '\t<PropertyGroup Type="' + typeText + '" Name="' + docName + '" ID="' + guid() + '" Version="2.1.5.0" />\n';
-	json += '\t<Content ctype="GameProjectContent">\n';
-	json += '\t\t<Content>\n';
-	json += '\t\t<Animation Duration="0" Speed="1.0000" />\n';
-	json += '\t\t<ObjectData Name="' + typeText + '" FrameEvent="" Tag="' + tagIndex + '" ctype="SingleNodeObjectData">\n';
+	var csd = '<GameFile>\n';
+	csd += '\t<PropertyGroup Name="' + docName + '" Type="' + typeText + '" ID="' + guid() + '" Version="3.10.0.0" />\n';
+	csd += '\t<Content ctype="GameProjectContent">\n';
+	csd += '\t\t<Content>\n';
+	csd += '\t\t<Animation Duration="0" Speed="1.0000" />\n';
+	if (typeText == 'Layer'){
+	    csd += '\t\t<ObjectData Name="' + typeText + '" Tag="' + tagIndex + '" ctype="GameLayerObjectData">\n';
+    } else {
+    	csd += '\t\t<ObjectData Name="' + typeText + '" Tag="' + tagIndex + '" ctype="GameNodeObjectData">\n'
+    }
 	tagIndex += 1;
-	json += '\t\t\t<Position X="0.0000" Y="0.0000" />\n';
-	json += '\t\t\t<Scale ScaleX="1.0000" ScaleY="1.0000" />\n';
-	json += '\t\t\t<AnchorPoint />\n';
-	json += '\t\t\t<CColor A="255" R="255" G="255" B="255" />\n';
-	json += '\t\t\t<Size X="' + docWidth + '" Y="' + docHeight + '" />\n';
-	json += '\t\t\t<PrePosition X="0.0000" Y="0.0000" />\n';
-	json += '\t\t\t<PreSize X="0.0000" Y="0.0000" />\n';
-	json += '\t\t\t<Children>\n';
+	if (typeText != 'Node'){
+	    csd += '\t\t\t<Size X="' + docWidth + '" Y="' + docHeight + '" />\n';
+    }
+	csd += '\t\t\t<Children>\n';
 
-	// Output slots.
-	// var slotsCount = countAssocArray(slots);
-	// var slotIndex = 0;
-	// for (var slotName in slots) {
-	// 	if (!slots.hasOwnProperty(slotName)) continue;
+	// Output imgs.
+	var imgsCount = countAssocArray(imgs);
+	var imgIndex = 0;
+	for (var imgName in imgs) {
+		if (!imgs.hasOwnProperty(imgName)) continue;
+		// csd += '\t"' + imgName + '":{\n';
 
-	// 	// Use image prefix if slot's attachment is in the default skin.
-	// 	var attachmentName = slotName;
-	// 	var defaultSkinLayers = skins["default"];
-	// 	for (var i = defaultSkinLayers.length - 1; i >= 0; i--) {
-	// 		if (layerName(defaultSkinLayers[i]) == slotName) {
-	// 			attachmentName = slotName;
-	// 			break;
-	// 		}
-	// 	}
-
-	// 	json += '\t{"name":"' + slotName + '","bone":"root","attachment":"' + attachmentName + '"}';
-	// 	slotIndex++;
-	// 	json += slotIndex < slotsCount ? ",\n" : "\n";
-	// }
-	// json += '],\n"skins":{\n';
-
-	// Output skins.
-	var skinsCount = countAssocArray(skins);
-	var skinIndex = 0;
-	for (var skinName in skins) {
-		if (!skins.hasOwnProperty(skinName)) continue;
-		// json += '\t"' + skinName + '":{\n';
-
-		var skinLayers = skins[skinName];
-		var skinLayersCount = skinLayers.length;
-		var skinLayerIndex = 0;
-		// for (var i = skinLayersCount - 1; i >= 0; i--) {
-		for (var i = 0; i < skinLayersCount; i++) {
-			var layer = skinLayers[i];
+		var imgLayers = imgs[imgName];
+		var imgLayersCount = imgLayers.length;
+		var imgLayerIndex = 0;
+		// for (var i = imgLayersCount - 1; i >= 0; i--) {
+		for (var i = 0; i < imgLayersCount; i++) {
+			var layer = imgLayers[i];
 			var slotName = layerName(layer);
 			var placeholderName, attachmentName;
-			if (skinName == "default") {
+			if (imgName == "default") {
 				placeholderName = slotName;
 				attachmentName = placeholderName;
 			} else {
 				placeholderName = slotName;
-				attachmentName = skinName + "/" + slotName;
+				attachmentName = imgName + "/" + slotName;
 			}
 
 			var x = activeDocument.width.as("px") * pngScale;
@@ -210,7 +188,7 @@ function run () {
 				if (pngScale != 1) scaleImage();
 				if (padding > 0) activeDocument.resizeCanvas(width, height, AnchorPosition.MIDDLECENTER);
 
-				if (skinName != "default") new Folder(absImagesDir + skinName).create();
+				if (imgName != "default") new Folder(absImagesDir + imgName).create();
 				activeDocument.saveAs(new File(absImagesDir + attachmentName), new PNGSaveOptions(), true, Extension.LOWERCASE);
 			}
 
@@ -226,52 +204,40 @@ function run () {
 				y -= activeDocument.height.as("px") * pngScale - yOffSet * pngScale; // Invert y.
 			}
 
-			json += '\t\t\t\t<NodeObjectData Name="' + slotName + '" ActionTag="' + tenNum() + '" FrameEvent="" Tag="' + tagIndex + '" ctype="SpriteObjectData">\n';
+			csd += '\t\t\t\t<AbstractNodeData Name="' + slotName + '" ActionTag="' + tenNum() + '" FrameEvent="" Tag="' + tagIndex + '" ctype="SpriteObjectData">\n';
 			tagIndex += 1;
-			// json += '\t\t\t\t\t<Position X="' + (x - Math.round(width) * 0.5000) + '" Y="' + (y - Math.round(height) * 0.5000) + '" />\n';
-			json += '\t\t\t\t\t<Position X="' + (x) + '" Y="' + (y) + '" />\n';
-             json += '\t\t\t\t\t<Scale ScaleX="1.0000" ScaleY="1.0000" />\n';
-             json += '\t\t\t\t\t<AnchorPoint ScaleX="0.5000" ScaleY="0.5000" />\n';
-             json += '\t\t\t\t\t<CColor A="255" R="255" G="255" B="255" />\n';
-             json += '\t\t\t\t\t<Size X="' + Math.round(width) + '" Y="' + Math.round(height) + '" />\n';
-             json += '\t\t\t\t\t<PrePosition X="0.0000" Y="0.0000" />\n';
-             json += '\t\t\t\t\t<PreSize X="0.0000" Y="0.0000" />\n';
-             json += '\t\t\t\t\t<FileData Type="Normal" Path="' + relImagesDir + placeholderName + '.png" />\n';
-		    json += '\t\t\t\t</NodeObjectData>\n';
-			// if (attachmentName == placeholderName) {
-				// json += '\t\t"' + slotName + '":{"' + placeholderName + '":{'
-					// + '"x":' + x + ',"y":' + y + ',"width":' + Math.round(width) + ',"height":' + Math.round(height) + '}}';
-			// } else {
-				// json += '\t\t"' + slotName + '":{"' + placeholderName + '":{"name":"' + attachmentName + '", '
-					// + '"x":' + x + ',"y":' + y + ',"width":' + Math.round(width) + ',"height":' + Math.round(height) + '}}';
-			// }
+			csd += '\t\t\t\t\t<Position X="' + (x) + '" Y="' + (y) + '" />\n';
+            csd += '\t\t\t\t\t<Scale ScaleX="1.0000" ScaleY="1.0000" />\n';
+            csd += '\t\t\t\t\t<AnchorPoint ScaleX="0.5000" ScaleY="0.5000" />\n';
+            csd += '\t\t\t\t\t<CColor A="255" R="255" G="255" B="255" />\n';
+            csd += '\t\t\t\t\t<Size X="' + Math.round(width) + '" Y="' + Math.round(height) + '" />\n';
+            csd += '\t\t\t\t\t<PrePosition X="0.0000" Y="0.0000" />\n';
+            csd += '\t\t\t\t\t<PreSize X="0.0000" Y="0.0000" />\n';
+            csd += '\t\t\t\t\t<FileData Type="Normal" Path="' + relImagesDir + placeholderName + '.png" />\n';
+		    csd += '\t\t\t\t</AbstractNodeData>\n';
 
-			skinLayerIndex++;
-			// json += skinLayerIndex < skinLayersCount ? ",\n" : "\n";
+			imgLayerIndex++;
 		}
-		//json += "\t\}";
 
-		skinIndex++;
-		// json += skinIndex < skinsCount ? ",\n" : "\n";
+		imgIndex++;
 	}
-	//json += '},\n"animations":{"animation":{}}\n}';
-	json += '\t\t\t</Children>\n';
-    json += '\t\t</ObjectData>\n';
-    json += '\t\t</Content>\n';
-	json += '\t</Content>\n';
-	json += '</GameProjectFile>\n';
+	csd += '\t\t\t</Children>\n';
+    csd += '\t\t</ObjectData>\n';
+    csd += '\t\t</Content>\n';
+	csd += '\t</Content>\n';
+	csd += '</GameFile>\n';
 
 	activeDocument.close(SaveOptions.DONOTSAVECHANGES);
 
-	// Output JSON file.
-	if (writeJson) {
+	// Output csd file.
+	if (writeCsd) {
 		var name = decodeURI(originalDoc.name);
 		name = name.substring(0, name.indexOf("."));
 		var file = new File(absProjectDir + name + ".csd");
 		file.remove();
 		file.open("w", "TEXT");
 		file.lineFeed = "\n";
-		file.write(json);
+		file.write(csd);
 		file.close();
 	}
 }
@@ -299,15 +265,15 @@ function showDialog () {
 			writePngsCheckbox.value = writePngs;
 			var writeTemplateCheckbox = group.add("checkbox", undefined, " Write a template PNG");
 			writeTemplateCheckbox.value = writeTemplate;
-			var writeJsonCheckbox = group.add("checkbox", undefined, " Write Spine JSON");
-			writeJsonCheckbox.value = writeJson;
+			var writeCsdCheckbox = group.add("checkbox", undefined, " Write Spine csd");
+			writeCsdCheckbox.value = writeCsd;
 		group = checkboxGroup.add("group");
 			group.orientation = "column";
 			group.alignChildren = "left";
 			var ignoreHiddenLayersCheckbox = group.add("checkbox", undefined, " Ignore hidden layers");
 			ignoreHiddenLayersCheckbox.value = ignoreHiddenLayers;
-			var groupsAsSkinsCheckbox = group.add("checkbox", undefined, " Use groups as skins");
-			groupsAsSkinsCheckbox.value = groupsAsSkins;
+			var groupsAsimgsCheckbox = group.add("checkbox", undefined, " Use groups as imgs");
+			groupsAsimgsCheckbox.value = groupsAsimgs;
 			var useRulerOriginCheckbox = group.add("checkbox", undefined, " Use ruler origin as 0,0");
 			useRulerOriginCheckbox.value = useRulerOrigin;
 
@@ -391,11 +357,11 @@ function showDialog () {
 	function updateSettings () {
 		writePngs = writePngsCheckbox.value;
 		writeTemplate = writeTemplateCheckbox.value;
-		writeJson = writeJsonCheckbox.value;
+		writeCsd = writeCsdCheckbox.value;
 		ignoreHiddenLayers = ignoreHiddenLayersCheckbox.value;
 		var scaleValue = parseFloat(scaleText.text);
 		if (scaleValue > 0 && scaleValue <= 100) pngScale = scaleValue / 100;
-		groupsAsSkins = groupsAsSkinsCheckbox.value;
+		groupsAsimgs = groupsAsimgsCheckbox.value;
 		useRulerOrigin = useRulerOriginCheckbox.value;
 		imagesDir = imagesDirText.text;
 		projectDir = projectDirText.text;
@@ -424,7 +390,7 @@ function showDialog () {
 		try {
 			run();
 		} catch (e) {
-			alert("An unexpected error has occurred.\n\nTo debug, run the LayersToPNG script using Adobe ExtendScript "
+			alert("An unexpected error has occurred.\n\nTo debug, run the LayersToCSD script using Adobe ExtendScript "
 				+ "with \"Debug > Do not break on guarded exceptions\" unchecked.");
 			debugger;
 		} finally {
@@ -447,10 +413,10 @@ function loadSettings () {
 	settings = app.getCustomOptions(settingsID);
 	if (settings.hasKey(writePngsID)) writePngs = settings.getBoolean(writePngsID);
 	if (settings.hasKey(writeTemplateID)) writeTemplate = settings.getBoolean(writeTemplateID);
-	if (settings.hasKey(writeJsonID)) writeJson = settings.getBoolean(writeJsonID);
+	if (settings.hasKey(writeCsdID)) writeCsd = settings.getBoolean(writeCsdID);
 	if (settings.hasKey(ignoreHiddenLayersID)) ignoreHiddenLayers = settings.getBoolean(ignoreHiddenLayersID);
 	if (settings.hasKey(pngScaleID)) pngScale = settings.getDouble(pngScaleID);
-	if (settings.hasKey(groupsAsSkinsID)) groupsAsSkins = settings.getBoolean(groupsAsSkinsID);
+	if (settings.hasKey(groupsAsimgsID)) groupsAsimgs = settings.getBoolean(groupsAsimgsID);
 	if (settings.hasKey(useRulerOriginID)) useRulerOrigin = settings.getBoolean(useRulerOriginID);
 	if (settings.hasKey(imagesDirID)) imagesDir = settings.getString(imagesDirID);
 	if (settings.hasKey(projectDirID)) projectDir = settings.getString(projectDirID);
@@ -461,10 +427,10 @@ function saveSettings () {
 	var settings = new ActionDescriptor();
 	settings.putBoolean(writePngsID, writePngs);
 	settings.putBoolean(writeTemplateID, writeTemplate);
-	settings.putBoolean(writeJsonID, writeJson);
+	settings.putBoolean(writeCsdID, writeCsd);
 	settings.putBoolean(ignoreHiddenLayersID, ignoreHiddenLayers);
 	settings.putDouble(pngScaleID, pngScale);
-	settings.putBoolean(groupsAsSkinsID, groupsAsSkins);
+	settings.putBoolean(groupsAsimgsID, groupsAsimgs);
 	settings.putBoolean(useRulerOriginID, useRulerOrigin);
 	settings.putString(imagesDirID, imagesDir);
 	settings.putString(projectDirID, projectDir);
